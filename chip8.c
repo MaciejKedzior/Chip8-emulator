@@ -32,12 +32,12 @@ void initialize(struct chip8* chip8){
     chip8->pc = 0x200;      //512
     chip8->I = 0;
     chip8->sp = 0;
-    chip8->opcode =0;
+    chip8->opcode = 0;
 
-    memset(chip8->gfx, 0, sizeof(uint16_t)*2048);
-    memset(chip8->stack, 0, sizeof(uint16_t)*16);
-    memset(chip8->key, 0, sizeof(uint16_t)*16);
-    memset(chip8->V, 0, sizeof(uint16_t)*16);
+    memset(chip8->gfx, 0, sizeof(uint16_t)*PIXELS);
+    memset(chip8->stack, 0, sizeof(uint16_t)*HEX);
+    memset(chip8->key, 0, sizeof(uint16_t)*HEX);
+    memset(chip8->V, 0, sizeof(uint16_t)*HEX);
 
     for (int i=0; i < 80; i++){
         chip8->memory[i] = chip8_fontset[i];
@@ -55,21 +55,21 @@ void initialize(struct chip8* chip8){
 
 void loadApplication(struct chip8* chip8, const char* filename){
     uint32_t open_code, read_code;
-    uint16_t buffer[4096];
+    uint16_t buffer[MEM_SIZ];
 
     open_code = open(filename, O_RDONLY);
     if (open_code == -1){
         perror("Error loading application: ");
         exit(EXIT_FAILURE);
     }
-    read_code = read(open_code, buffer, 4096);
+    read_code = read(open_code, buffer, MEM_SIZ);
     if (read_code == -1){
         perror("Error while reading file: ");
         exit(EXIT_FAILURE);
     }
 
-    if (read_code - 512 > 4096)
-        for (uint32_t i=0; i < 4096; i++)
+    if (read_code - 512 > MEM_SIZ)
+        for (uint32_t i=0; i < MEM_SIZ; i++)
             chip8->memory[i+512] = buffer[i];
     else{
         printf("Error, the file is too long");
@@ -88,7 +88,7 @@ void emulateCycle(struct chip8* chip8){
             switch (chip8->opcode & 0x000F){
 
                 case 0x0000:        //0x00E0: Clears the screen
-                    for (uint32_t i=0; i < 64*32; ++i) 
+                    for (uint32_t i=0; i < PIXELS; ++i) 
                         chip8->gfx[i] = 0x0;
                     chip8->drawFlag = true;
                     chip8->pc += 2;
@@ -176,10 +176,6 @@ void emulateCycle(struct chip8* chip8){
             chip8->pc += 2;
         break;
 
-        case 0xD000:
-            printf("%d", chip8->V[(chip8->opcode & 0x0F00) >> 8]);
-            chip8->pc += 2;
-        break;
         //more cases
 
         default:
