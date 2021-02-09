@@ -8,6 +8,25 @@
 #include <unistd.h>         //for read
 #include "chip8.h"
 
+static uint16_t chip8_fontset[80] = { 
+  0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+  0x20, 0x60, 0x20, 0x20, 0x70, // 1
+  0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+  0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+  0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+  0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+  0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+  0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+  0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+  0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+  0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+  0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+  0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+  0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+  0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+  0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+};
+
 
 void initialize(struct chip8* chip8){
     chip8->pc = 0x200;      //512
@@ -30,6 +49,7 @@ void initialize(struct chip8* chip8){
     chip8->drawFlag = true;
 
     srand(time(NULL));
+    printf("Finished initialization!\n");
 }
 
 
@@ -55,19 +75,21 @@ void loadApplication(struct chip8* chip8, const char* filename){
         printf("Error, the file is too long");
         exit(EXIT_FAILURE);
     }
-
+    printf("Finished loading file!\n");
 }
 
 void emulateCycle(struct chip8* chip8){
     //Fetching opcode
     chip8->opcode = chip8->memory[chip8->pc] << 8 | chip8->memory[chip8->pc+1];
 
+    //Executing opcode
     switch (chip8->opcode & 0xF000){
         case 0x0000:
             switch (chip8->opcode & 0x000F){
 
                 case 0x0000:        //0x00E0: Clears the screen
-                    for (uint32_t i=0; i < 64*32; ++i) chip8->gfx[i] = 0x0;
+                    for (uint32_t i=0; i < 64*32; ++i) 
+                        chip8->gfx[i] = 0x0;
                     chip8->drawFlag = true;
                     chip8->pc += 2;
                 break;
@@ -101,6 +123,38 @@ void emulateCycle(struct chip8* chip8){
                 chip8->pc += 2;
         break;
 
+        case 0x4000:     // 0x4XNN 0 if (VX != NN) - skips the next instruction if VX is not equal to NN
+            if (chip8->V[(chip8->opcode & 0x0F00) >> 8] != chip8->opcode & 0x00FF)
+                chip8->pc += 4;     //because we skip next instruction
+            else
+                chip8->pc += 2;
+        break;
+
+        case 0x5000:    // 0x5XY0 - Skips the next instruction if VX is equal to VY
+            if (chip8->V[(chip8->opcode & 0x0F00) >> 8] == chip8->V[(chip8->opcode & 0x00F0) >> 4])
+                chip8->pc += 4;     //because we skip next instruction
+            else
+                chip8->pc += 2;
+        break;
+
+        case 0x6000:    // 0x6XNN - Sets VX to NN
+            chip8->V[(chip8->opcode & 0x0F00) >> 8] = chip8->opcode & 0x00FF;
+            chip8->pc += 2;
+        break;
+
+        case 0x7000:    // 0x7XNN - Adds NN to VX (Carry flag is not changed)
+            chip8->V[(chip8->opcode & 0x0F00) >> 8] += chip8->opcode & 0x00FF;
+            chip8->pc += 2;
+        break;
+
+        case 0x8000:    
+            switch (chip8->opcode & 0x000F){
+                case 0x0000:         // 0x8XY0 - Sets VX to the value of VY.
+                    chip8->V[(chip8->opcode & 0x0F00) >> 8 ] = chip8->V[(chip8->opcode & 0x00F0) >> 4];
+                break;
+            }
+            
+
         case 0xA000:
             chip8->I = chip8->opcode & 0x0FFF;
             chip8->pc += 2;
@@ -122,8 +176,12 @@ void emulateCycle(struct chip8* chip8){
             chip8->pc += 2;
         break;
 
+        case 0xD000:
+            printf("%d", chip8->V[(chip8->opcode & 0x0F00) >> 8]);
+            chip8->pc += 2;
+        break;
         //more cases
-        
+
         default:
             printf("Unknown opcode 0x%X\n", chip8->opcode);
     }
